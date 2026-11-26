@@ -77,22 +77,8 @@ Si el comando `ssh` no está disponible, instala **Cliente OpenSSH** desde las c
 2. Indica un nombre, por ejemplo `practica-cicd-ec2`.
 3. Selecciona **Private**. No marques la creación de README, licencia ni `.gitignore`, porque ya están incluidos en el material.
 4. Pulsa **Create repository**.
-5. Descarga y descomprime el ZIP del ejercicio en Windows (si tu profesor te ha facilitado un repositorio de partida, puedes usar **Code → Download ZIP** en ese repositorio). Abre en VS Code la carpeta que contiene directamente el `README.md`. Comprueba que `.github` está incluida. Trabajarás en tu propio repositorio privado, no en el repositorio de partida del profesor.
-
-**Importante:** todavía no hagas el primer `push`. Prepara primero el servidor, el acceso SSH y los secretos. Así evitarás un primer despliegue fallido.
-
-En una terminal PowerShell de VS Code, desde la carpeta del proyecto:
-
-```powershell
-Get-ChildItem -Force
-```
-
-Configura tu identidad de Git, sustituyendo los valores por tu nombre y correo:
-
-```powershell
-git config --global user.name "TU NOMBRE"
-git config --global user.email "TU CORREO DE GITHUB"
-```
+5. Descarga y descomprime el ZIP del ejercicio en Windows.
+6. sube el contenido del zip al repositorio.
 
 ## 4. Crear la instancia EC2
 
@@ -272,9 +258,7 @@ En AWS → EC2 → Security Groups → grupo asociado a la instancia → Inbound
 
 La máquina temporal de GitHub tiene una IP distinta de la de tu ordenador y puede cambiar en cada ejecución. El workflow muestra su IP pública en el paso **Conectar a EC2** y reintenta la conexión durante aproximadamente 5–10 minutos.
 
-**Opción recomendada:** cuando se inicie el workflow, consulta esa IP en Actions y añade una regla SSH TCP 22 con origen `IP_DEL_RUNNER/32`. Guarda y el job continuará al poder conectarse. Retira esa regla al terminar. Repite si la IP cambia. El proceso de despliegue es automático, pero esta autorización de red requiere intervención manual por ejecución.
-
-**Alternativa de laboratorio**, solo con permiso del profesor y en una instancia aislada y temporal: añadir una regla SSH TCP 22, origen Anywhere-IPv4 (`0.0.0.0/0`), justo antes de la serie de pruebas. Así no habrá intervención entre los pushes. Elimina esa regla en cuanto termines (conserva Mi IP). Esto expone SSH a Internet, incluso si solo admite claves; AWS desaconseja esta configuración. No la uses en producción, en instancias compartidas ni como regla permanente. Si el centro prohíbe abrirla, utiliza la opción /32.
+**Opción pruebas:** En una instancia aislada y temporal: añadir una regla SSH TCP 22, origen Anywhere-IPv4 (`0.0.0.0/0`), justo antes de la serie de pruebas. Así no habrá intervención entre los pushes. Elimina esa regla en cuanto termines (conserva Mi IP). Esto expone SSH a Internet, incluso si solo admite claves; AWS desaconseja esta configuración. No la uses en producción, en instancias compartidas ni como regla permanente. Si el centro prohíbe abrirla, utiliza la opción /32.
 
 No abras 3306. No necesitas conceder permisos AWS a GitHub ni instalar servicios adicionales.
 
