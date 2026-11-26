@@ -1,11 +1,6 @@
 # Práctica guiada: CI/CD de PHP y MySQL en AWS EC2
 
-**Ciclo:** DAW / ASIR · **Duración orientativa:** 3–4 horas · **Modalidad:** individual
-
-## 1. Reto y objetivos
-
-Una empresa quiere publicar automáticamente una aplicación PHP con MySQL cada vez que se actualice la rama `main` de su repositorio. Configurarás desde cero un servidor EC2 al que GitHub Actions se conectará mediante SSH desde su máquina temporal (`ubuntu-latest`).
-
+## 1. Objetivos
 Al finalizar serás capaz de crear una instancia EC2, construir una imagen propia mediante un Dockerfile, orquestar dos servicios con Compose, utilizar secretos y demostrar que los datos sobreviven a un nuevo despliegue.
 
 ```mermaid
