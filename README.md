@@ -8,7 +8,7 @@ Una empresa quiere publicar automáticamente una aplicación PHP con MySQL cada 
 
 Al finalizar serás capaz de crear una instancia EC2, construir una imagen propia mediante un Dockerfile, orquestar dos servicios con Compose, utilizar secretos y demostrar que los datos sobreviven a un nuevo despliegue.
 
-```mermaid
+```mermaid 
 flowchart TD
     A[Ordenador Windows] -->|git push| B[GitHub Actions]
     B --> C[Runner de GitHub: ubuntu-latest]
