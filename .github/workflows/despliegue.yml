@@ -13,7 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 25
     env:
-      EC2_HOST: ${{ vars.EC2_HOST }}
+      EC2_HOST: ${{ secrets.EC2_HOST }}
     steps:
       - name: Descargar codigo
         uses: actions/checkout@v6
@@ -22,26 +22,30 @@ jobs:
       - name: Preparar SSH
         env:
           EC2_SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
-          EC2_KNOWN_HOSTS: ${{ secrets.EC2_KNOWN_HOSTS }}
         run: |
           set -euo pipefail
           test -n "$EC2_HOST"
+          [[ "$EC2_HOST" =~ ^[0-9]{1,3}(\.[0-9]{1,3}){3}$ ]] || { echo 'EC2_HOST debe contener la IPv4 publica de EC2.'; exit 1; }
           test -n "$EC2_SSH_KEY"
-          test -n "$EC2_KNOWN_HOSTS"
+          ssh-keygen -l -f ec2_host_ed25519.pub > /dev/null || { echo 'Completa ec2_host_ed25519.pub con la clave publica verificada de EC2.'; exit 1; }
           install -d -m 700 ~/.ssh
           umask 077
           printf '%s\n' "$EC2_SSH_KEY" | tr -d '\r' > ~/.ssh/ec2.pem
-          printf '%s\n' "$EC2_KNOWN_HOSTS" | tr -d '\r' > ~/.ssh/known_hosts
-          cat > ~/.ssh/config <<EOF
+          awk '$1 == "ssh-ed25519" {print "ec2-practica", $1, $2}' ec2_host_ed25519.pub > ~/.ssh/known_hosts
+          test -s ~/.ssh/known_hosts
+          cat > ~/.ssh/config <<EOF_SSH
           Host ec2
             HostName $EC2_HOST
+            HostKeyAlias ec2-practica
+            HostKeyAlgorithms ssh-ed25519
+            AddressFamily inet
             User ubuntu
             IdentityFile ~/.ssh/ec2.pem
             IdentitiesOnly yes
             BatchMode yes
             StrictHostKeyChecking yes
             ConnectTimeout 10
-          EOF
+          EOF_SSH
       - name: Conectar a EC2
         run: |
           echo "IP publica del runner (autoriza /32 si SSH esta restringido):"
@@ -54,21 +58,38 @@ jobs:
       - name: Copiar archivos a EC2
         run: |
           ssh ec2 'mkdir -p ~/practica-cicd'
-          rsync -az --delete --exclude='.env' Dockerfile compose.yaml .dockerignore src mysql ec2:~/practica-cicd/
-      - name: Configurar MySQL y desplegar
-        env:
-          MYSQL_ROOT_PASSWORD: ${{ secrets.MYSQL_ROOT_PASSWORD }}
-          MYSQL_PASSWORD: ${{ secrets.MYSQL_PASSWORD }}
+          rsync -az --delete --exclude='.env' Dockerfile compose.yaml .dockerignore .env.example src mysql ec2:~/practica-cicd/
+      - name: Preparar .env y desplegar
         run: |
+          ssh ec2 'bash -s' <<'REMOTE'
           set -euo pipefail
-          for clave in "$MYSQL_ROOT_PASSWORD" "$MYSQL_PASSWORD"; do
-            if [[ ! "$clave" =~ ^[a-zA-Z0-9]{20,}$ ]]; then
-              echo 'Las contrasenas deben tener al menos 20 caracteres alfanumericos.'
+          cd ~/practica-cicd
+          umask 077
+          docker info > /dev/null
+          if [ ! -f .env ]; then
+            if docker volume inspect practica-cicd_mysql_data >/dev/null 2>&1; then
+              echo 'Existe un volumen MySQL pero falta .env. Recupera el archivo original antes de continuar.'
               exit 1
             fi
-          done
-          printf 'MYSQL_ROOT_PASSWORD=%s\nMYSQL_PASSWORD=%s\n' "$MYSQL_ROOT_PASSWORD" "$MYSQL_PASSWORD" | ssh ec2 'cd ~/practica-cicd && umask 077 && cat > .env && chmod 600 .env'
-          ssh ec2 'cd ~/practica-cicd && docker compose config --quiet && docker compose up -d --build --remove-orphans --wait --wait-timeout 180'
+            temporal=$(mktemp .env.tmp.XXXXXX)
+            trap 'rm -f "$temporal"' EXIT
+            cp .env.example "$temporal"
+            password=$(openssl rand -hex 24)
+            root_password=$(openssl rand -hex 24)
+            sed -i "s/^MYSQL_PASSWORD=GENERAR_PASSWORD$/MYSQL_PASSWORD=$password/; s/^MYSQL_ROOT_PASSWORD=GENERAR_ROOT_PASSWORD$/MYSQL_ROOT_PASSWORD=$root_password/" "$temporal"
+            grep -Eq '^MYSQL_PASSWORD=[0-9a-f]{48}$' "$temporal"
+            grep -Eq '^MYSQL_ROOT_PASSWORD=[0-9a-f]{48}$' "$temporal"
+            chmod 600 "$temporal"
+            mv "$temporal" .env
+            echo 'Archivo .env creado con contrasenas aleatorias.'
+          else
+            test -s .env || { echo 'El archivo .env esta vacio. Recupera la configuracion original.'; exit 1; }
+            echo 'Se conserva el archivo .env existente.'
+          fi
+          chmod 600 .env
+          docker compose config --quiet
+          docker compose up -d --build --remove-orphans --wait --wait-timeout 180
+          REMOTE
       - name: Comprobar despliegue
         run: |
           ssh ec2 'cd ~/practica-cicd && docker compose ps && curl --fail --silent --show-error http://127.0.0.1/ > /dev/null'
