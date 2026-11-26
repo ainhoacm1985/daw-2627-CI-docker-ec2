@@ -471,62 +471,6 @@ docker logs --tail 50 practica-cicd-web-1
 docker logs --tail 50 practica-cicd-db-1
 ```
 
-No compartas logs que contengan credenciales u otros datos sensibles. Si aparecen nombres distintos, usa los mostrados por `docker ps -a`.
 
-## 17. Evidencias y evaluación
 
-Entrega una memoria breve con capturas numeradas y explicaciones propias:
 
-- [ ] EC2 activa y reglas de entrada (sin mostrar claves).
-- [ ] Docker y Compose funcionando sin sudo.
-- [ ] Runner en estado Idle y sus etiquetas.
-- [ ] Secretos creados (solo nombres).
-- [ ] Primera ejecución correcta en Actions y web versión 1.0 con registros.
-- [ ] Segundo commit, ejecución correcta y web versión 2.0 con los mismos registros.
-- [ ] Salida de `docker ps` y `docker volume ls`.
-- [ ] Respuestas a las preguntas finales.
-
-| Criterio | Puntos |
-|---|---:|
-| Configuración EC2, acceso SSH y Docker | 2 |
-| Runner instalado y correctamente registrado | 2 |
-| Comprensión Dockerfile, Compose y aplicación | 2 |
-| Secretos y automatización de los despliegues | 2 |
-| Persistencia demostrada | 1 |
-| Evidencias, seguridad y respuestas | 1 |
-| Total | 10 |
-
-Preguntas finales:
-
-1. ¿Qué diferencia hay entre una imagen y un contenedor?
-2. ¿Qué relación hay entre `build` en Compose y el Dockerfile?
-3. ¿Por qué PHP se conecta al host `db` y no a `localhost`?
-4. ¿Por qué no se necesita publicar el puerto 3306?
-5. ¿En qué máquina se ejecuta cada comando del workflow? ¿Cómo recibe los trabajos el runner?
-6. ¿Qué ocurriría si la instancia está apagada al realizar un push?
-7. ¿Qué diferencia hay entre `docker compose up -d --build` y borrar el volumen?
-8. ¿Por qué modificar el archivo SQL de inicialización no altera una base existente?
-9. ¿Por qué no debemos utilizar este runner con repositorios públicos o código de terceros no confiable?
-
-## 18. Finalizar la práctica y evitar costes
-
-Después de entregar las evidencias, sigue las indicaciones del profesor. Si vas a continuar otro día, puedes detener EC2; el almacenamiento EBS puede seguir generando costes y la IP pública puede cambiar. Los trabajos no podrán ejecutarse mientras el runner esté apagado.
-
-Si vas a eliminar definitivamente el laboratorio, exporta primero los datos que necesites. En Ubuntu, desde `~/actions-runner`, detén y desinstala el servicio:
-
-```bash
-sudo ./svc.sh stop
-sudo ./svc.sh uninstall
-```
-
-Desde GitHub → Settings → Actions → Runners → tu runner → Remove, sigue las instrucciones de eliminación (incluido `./config.sh remove --token ...` si corresponde). Elimina los secretos de laboratorio si ya no son necesarios. Termina la instancia en AWS únicamente cuando no necesites recuperar datos. Revisa también volúmenes EBS, snapshots e IPs elásticas que pudieran seguir facturándose. No termines una instancia ajena o compartida.
-
-## Referencias oficiales
-
-- [Instalar Docker Engine en Ubuntu](https://docs.docker.com/engine/install/ubuntu/)
-- [Añadir runners autohospedados](https://docs.github.com/en/actions/how-tos/manage-runners/self-hosted-runners/add-runners)
-- [Configurar el runner como servicio](https://docs.github.com/en/actions/how-tos/manage-runners/self-hosted-runners/configure-the-application)
-- [Seguridad de GitHub Actions](https://docs.github.com/en/actions/reference/security/secure-use)
-- [Acción checkout](https://github.com/actions/checkout)
-- [Docker Compose up](https://docs.docker.com/reference/cli/docker/compose/up/)
-- [Imagen oficial MySQL](https://hub.docker.com/_/mysql)
