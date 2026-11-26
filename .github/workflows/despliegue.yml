@@ -1,0 +1,77 @@
+name: Despliegue en EC2
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: despliegue-ec2
+  cancel-in-progress: false
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      EC2_HOST: ${{ vars.EC2_HOST }}
+    steps:
+      - name: Descargar codigo
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Preparar SSH
+        env:
+          EC2_SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
+          EC2_KNOWN_HOSTS: ${{ secrets.EC2_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          test -n "$EC2_HOST"
+          test -n "$EC2_SSH_KEY"
+          test -n "$EC2_KNOWN_HOSTS"
+          install -d -m 700 ~/.ssh
+          umask 077
+          printf '%s\n' "$EC2_SSH_KEY" | tr -d '\r' > ~/.ssh/ec2.pem
+          printf '%s\n' "$EC2_KNOWN_HOSTS" | tr -d '\r' > ~/.ssh/known_hosts
+          cat > ~/.ssh/config <<EOF
+          Host ec2
+            HostName $EC2_HOST
+            User ubuntu
+            IdentityFile ~/.ssh/ec2.pem
+            IdentitiesOnly yes
+            BatchMode yes
+            StrictHostKeyChecking yes
+            ConnectTimeout 10
+          EOF
+      - name: Conectar a EC2
+        run: |
+          echo "IP publica del runner (autoriza /32 si SSH esta restringido):"
+          curl -4fsS https://checkip.amazonaws.com || true
+          for intento in {1..30}; do
+            if ssh ec2 'true'; then exit 0; fi
+            sleep 10
+          done
+          exit 1
+      - name: Copiar archivos a EC2
+        run: |
+          ssh ec2 'mkdir -p ~/practica-cicd'
+          rsync -az --delete --exclude='.env' Dockerfile compose.yaml .dockerignore src mysql ec2:~/practica-cicd/
+      - name: Configurar MySQL y desplegar
+        env:
+          MYSQL_ROOT_PASSWORD: ${{ secrets.MYSQL_ROOT_PASSWORD }}
+          MYSQL_PASSWORD: ${{ secrets.MYSQL_PASSWORD }}
+        run: |
+          set -euo pipefail
+          for clave in "$MYSQL_ROOT_PASSWORD" "$MYSQL_PASSWORD"; do
+            if [[ ! "$clave" =~ ^[a-zA-Z0-9]{20,}$ ]]; then
+              echo 'Las contrasenas deben tener al menos 20 caracteres alfanumericos.'
+              exit 1
+            fi
+          done
+          printf 'MYSQL_ROOT_PASSWORD=%s\nMYSQL_PASSWORD=%s\n' "$MYSQL_ROOT_PASSWORD" "$MYSQL_PASSWORD" | ssh ec2 'cd ~/practica-cicd && umask 077 && cat > .env && chmod 600 .env'
+          ssh ec2 'cd ~/practica-cicd && docker compose config --quiet && docker compose up -d --build --remove-orphans --wait --wait-timeout 180'
+      - name: Comprobar despliegue
+        run: |
+          ssh ec2 'cd ~/practica-cicd && docker compose ps && curl --fail --silent --show-error http://127.0.0.1/ > /dev/null'
+      - name: Eliminar clave temporal
+        if: always()
+        run: rm -f ~/.ssh/ec2.pem
